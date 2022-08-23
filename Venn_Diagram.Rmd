@@ -1,0 +1,227 @@
+---
+title: "Venn Diagram"
+output: html_document
+---
+
+```{r setup, include=TRUE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(clusterProfiler)
+library(xtable)
+library(writexl)
+library(VennDiagram)
+library(GO.db)
+library(biomaRt)
+```
+
+All significantly regulated genes from the *GCGR Ab* and *GcgrKO* datasets are loaded:
+```{r}
+All_Sig_Genes_GCGR_Ab <- read.csv('~/All_Sig_Genes_GCGRAb_CtlAb.csv') 
+All_Sig_Genes_KOvsWT <- read.csv('~/"All_Sig_Genes_KOvsWT.csv"')
+```
+
+Comparing genes from the two datasets and exporting a list of the overlapping genes: 
+```{r message=FALSE, warning=FALSE}
+KO_Data_Venn_Up <- All_Sig_Genes_KOvsWT %>% 
+  filter(., log2FoldChange > 0) %>% 
+  dplyr::select('ENSEMBL') %>%
+  c(unlist(.['ENSEMBL'])) %>% .[-1]
+KO_Data_Venn_Down <- All_Sig_Genes_KOvsWT %>% 
+  filter(., log2FoldChange < 0) %>% 
+  dplyr::select('ENSEMBL') %>%
+  c(unlist(.['ENSEMBL'])) %>% .[-1]
+GCGR_Ab_Data_Venn_Up <- All_Sig_Genes_GCGR_Ab %>% 
+  filter(., log2FoldChange > 0) %>% 
+  dplyr::select('ENSEMBL') %>%
+  c(unlist(.['ENSEMBL'])) %>% .[-1]
+GCGR_Ab_Data_Venn_Down <- All_Sig_Genes_GCGR_Ab %>% 
+  filter(., log2FoldChange < 0) %>% 
+  dplyr::select('ENSEMBL') %>%
+  c(unlist(.['ENSEMBL'])) %>% .[-1]
+
+venn.diagram(x = list(KO_Data_Venn_Up,GCGR_Ab_Data_Venn_Up),
+             category.names = c(expression("GCGR"^"-/-") , "GCGR Ab"),
+             filename = 'VennDiagram_GCGR_KO_Ab_UP.png',
+             output=TRUE,
+             main = "Up-regulated genes",
+             main.pos = c(0.5,0.95),
+             main.cex = 0.9,
+          imagetype="png",
+          resolution = 1000,
+          compression = "lzw",
+          lty = "blank",
+          fill = c("#330099", "#33CC33"),
+          cex = 0.8,
+          fontfamily = "serif",
+          cat.cex = 0.8,
+          cat.pos = c(-0, 0),
+          cat.dist = c(0.03, 0.03),
+          cat.fontfamily = "serif",
+          disable.logging = TRUE)
+
+venn.diagram(x = list(KO_Data_Venn_Down,GCGR_Ab_Data_Venn_Down),
+             category.names = c(expression("GCGR"^"-/-") , "GCGR Ab"),
+             filename = 'VennDiagram_GCGR_KO_Ab_DOWN.png',
+             output=TRUE,
+             main = "Down-regulated genes",
+             main.pos = c(0.5,0.95),
+             main.cex = 0.9,
+          imagetype="png",
+          resolution = 1000,
+          compression = "lzw",
+          lty = "blank",
+          fill = c("#330099", "#33CC33"),
+          cex = 0.8,
+          fontfamily = "serif",
+          cat.cex = 0.8,
+          cat.pos = c(-0, 0),
+          cat.dist = c(0.03, 0.03),
+          cat.fontfamily = "serif",
+          disable.logging = TRUE)
+
+Down_Overlap <- calculate.overlap(x = list(KO_Data_Venn_Down,GCGR_Ab_Data_Venn_Down)) %>% .[["a3"]] %>% as.data.frame(row.names = "ENSEMBL") %>% t() %>% as_tibble() %>% semi_join(All_Sig_Genes_GCGR_Ab,., by = "ENSEMBL") %>% dplyr::select("ENSEMBL","gene_name","gene_symbol","padj","foldChange")
+
+Up_Overlap <- calculate.overlap(x = list(KO_Data_Venn_Up,GCGR_Ab_Data_Venn_Up)) %>% .[["a3"]] %>% as.data.frame(row.names = "ENSEMBL") %>% t() %>% as_tibble() %>% semi_join(All_Sig_Genes_GCGR_Ab,., by = "ENSEMBL") %>% dplyr::select("ENSEMBL","gene_name","gene_symbol", "padj","foldChange")
+
+All_Sig_Genes_KOvsWT_Overlap <- rename(All_Sig_Genes_KOvsWT, foldChange_KO = foldChange, padj_KO = padj) %>% dplyr::select("ENSEMBL", "padj_KO","foldChange_KO")
+
+Down_Overlap <- left_join(Down_Overlap, All_Sig_Genes_KOvsWT_Overlap, by = "ENSEMBL") %>% rename(., foldChange_Ab = foldChange, padj_Ab = padj)
+Up_Overlap <- left_join(Up_Overlap, All_Sig_Genes_KOvsWT_Overlap, by = "ENSEMBL") %>% rename(., foldChange_Ab = foldChange, padj_Ab = padj)
+
+write_xlsx(Down_Overlap, "Overlapping_Down_Genes_GcgrKO_GCGR-Ab.xlsx")
+write_xlsx(Up_Overlap, "Overlapping_UP_Genes_GcgrKO_GCGR-Ab.xlsx")
+```
+
+Creating a list of lipid annotated genes (GOBP annotated): 
+```{r message=FALSE, warning=FALSE}
+LipidGOBP <- unique(c(GOBPOFFSPRING[["GO:0006629"]],GOBPOFFSPRING[["GO:0010876"]],GOBPOFFSPRING[["GO:0055088"]]))
+
+Lipid_BP_Genes <- bitr(LipidGOBP, fromType="GOALL", toType= "SYMBOL", OrgDb='org.Mm.eg.db')
+Lipid_BP_Genes <- tibble("gene_symbol" = unique(Lipid_BP_Genes$SYMBOL))
+```
+  
+Comparing lipid related genes in the two datasets and exporting a list of the overlapping genes:
+```{r eval=FALSE, include=TRUE}
+KO_Data_Venn_Up <- All_Sig_Genes_KOvsWT %>% semi_join(., Lipid_BP_Genes, by = "gene_symbol") %>%
+  filter(., log2FoldChange > 0) %>% 
+  dplyr::select('ENSEMBL') %>%
+  c(unlist(.['ENSEMBL'])) %>% .[-1]
+KO_Data_Venn_Down <- All_Sig_Genes_KOvsWT %>% semi_join(., Lipid_BP_Genes, by = "gene_symbol") %>%
+  filter(., log2FoldChange < 0) %>% 
+  dplyr::select('ENSEMBL') %>%
+  c(unlist(.['ENSEMBL'])) %>% .[-1]
+GCGR_Ab_Data_Venn_Up <- All_Sig_Genes_GCGR_Ab %>% semi_join(., Lipid_BP_Genes, by = "gene_symbol") %>%
+  filter(., log2FoldChange > 0) %>% 
+  dplyr::select('ENSEMBL') %>%
+  c(unlist(.['ENSEMBL'])) %>% .[-1]
+GCGR_Ab_Data_Venn_Down <- All_Sig_Genes_GCGR_Ab %>% semi_join(., Lipid_BP_Genes, by = "gene_symbol") %>%
+  filter(., log2FoldChange < 0) %>% 
+  dplyr::select('ENSEMBL') %>%
+  c(unlist(.['ENSEMBL'])) %>% .[-1]
+
+venn.diagram(x = list(KO_Data_Venn_Up,GCGR_Ab_Data_Venn_Up),
+             category.names = c(expression("GCGR"^"-/-") , "GCGR Ab"),
+             filename = 'VennDiagram_GCGR_KO_Ab_UP_LIPID.png',
+             output=TRUE,
+             main = "Up-regulated genes",
+             main.pos = c(0.5,0.95),
+             main.cex = 0.9,
+          imagetype="png",
+          resolution = 1000,
+          compression = "lzw",
+          lty = "blank",
+          fill = c("#330099", "#33CC33"),
+          cex = 0.8,
+          fontfamily = "serif",
+          cat.cex = 0.8,
+          cat.pos = c(-0, 0),
+          cat.dist = c(0.03, 0.03),
+          cat.fontfamily = "serif",
+          disable.logging = TRUE)
+
+venn.diagram(x = list(KO_Data_Venn_Down,GCGR_Ab_Data_Venn_Down),
+             category.names = c(expression("GCGR"^"-/-") , "GCGR Ab"),
+             filename = 'VennDiagram_GCGR_KO_Ab_DOWN_LIPID.png',
+             output=TRUE,
+             main = "Down-regulated genes",
+             main.pos = c(0.5,0.95),
+             main.cex = 0.9,
+          imagetype="png",
+          resolution = 1000,
+          compression = "lzw",
+          lty = "blank",
+          fill = c("#330099", "#33CC33"),
+          cex = 0.8,
+          fontfamily = "serif",
+          cat.cex = 0.8,
+          cat.pos = c(-0, 0),
+          cat.dist = c(0.03, 0.03),
+          cat.fontfamily = "serif",
+          disable.logging = TRUE)
+
+Down_Overlap <- calculate.overlap(x = list(KO_Data_Venn_Down,GCGR_Ab_Data_Venn_Down)) %>% .[["a3"]] %>% as.data.frame(row.names = "ENSEMBL") %>% t() %>% as_tibble() %>% semi_join(All_Sig_Genes_GCGR_Ab,., by = "ENSEMBL") %>% dplyr::select("ENSEMBL","gene_name","gene_symbol","padj","foldChange")
+
+Up_Overlap <- calculate.overlap(x = list(KO_Data_Venn_Up,GCGR_Ab_Data_Venn_Up)) %>% .[["a3"]] %>% as.data.frame(row.names = "ENSEMBL") %>% t() %>% as_tibble() %>% semi_join(All_Sig_Genes_GCGR_Ab,., by = "ENSEMBL") %>% dplyr::select("ENSEMBL","gene_name","gene_symbol", "padj","foldChange")
+
+All_Sig_Genes_KOvsWT_Overlap <- rename(All_Sig_Genes_KOvsWT, foldChange_KO = foldChange, padj_KO = padj) %>% dplyr::select("ENSEMBL", "padj_KO","foldChange_KO")
+
+Down_Overlap <- left_join(Down_Overlap, All_Sig_Genes_KOvsWT_Overlap, by = "ENSEMBL") %>% rename(., foldChange_Ab = foldChange, padj_Ab = padj)
+Up_Overlap <- left_join(Up_Overlap, All_Sig_Genes_KOvsWT_Overlap, by = "ENSEMBL") %>% rename(., foldChange_Ab = foldChange, padj_Ab = padj)
+
+write_xlsx(Down_Overlap, "Overlapping_Down_Genes_GcgrKO_GCGR-Ab_LIPID.xlsx")
+write_xlsx(Up_Overlap, "Overlapping_UP_Genes_GcgrKO_GCGR-Ab_LIPID.xlsx")
+```
+
+Creating a list of amino acid annotated genes (GOBP annotated): 
+```{r message=FALSE, warning=FALSE}
+AA_GOBP <- unique(c(GOBPOFFSPRING[["GO:0006520"]],GOBPOFFSPRING[["GO:0006865"]],GOBPOFFSPRING[["GO:0080144"]], GOBPOFFSPRING[["GO:0043200"]]))
+
+AA_BP_Genes <- bitr(AA_GOBP, fromType="GOALL", toType= "SYMBOL", OrgDb='org.Mm.eg.db')
+AA_BP_Genes <- tibble("gene_symbol" = unique(AA_BP_Genes$SYMBOL))
+```
+  
+Comparing downregulated amino acid related genes in the two datasets and exporting a list of the overlapping genes:
+```{r eval=FALSE, include=TRUE}
+KO_Data_Venn_Down <- All_Sig_Genes_KOvsWT %>% semi_join(., AA_BP_Genes, by = "gene_symbol") %>%
+  filter(., log2FoldChange < 0) %>% 
+  dplyr::select('ENSEMBL') %>%
+  c(unlist(.['ENSEMBL'])) %>% .[-1]
+GCGR_Ab_Data_Venn_Down <- All_Sig_Genes_GCGR_Ab %>% semi_join(., AA_BP_Genes, by = "gene_symbol") %>%
+  filter(., log2FoldChange < 0) %>% 
+  dplyr::select('ENSEMBL') %>%
+  c(unlist(.['ENSEMBL'])) %>% .[-1]
+
+venn.diagram(x = list(KO_Data_Venn_Down,GCGR_Ab_Data_Venn_Down),
+             category.names = c(expression("GCGR"^"-/-") , "GCGR Ab"),
+             filename = 'VennDiagram_GCGR_KO_Ab_DOWN_AA.png',
+             output=TRUE,
+             main = "Down-regulated genes",
+             main.pos = c(0.5,0.95),
+             main.cex = 0.9,
+          imagetype="png",
+          resolution = 1000,
+          compression = "lzw",
+          lty = "blank",
+          fill = c("#330099", "#33CC33"),
+          cex = 0.8,
+          fontfamily = "serif",
+          cat.cex = 0.8,
+          cat.pos = c(10, -10),
+          cat.dist = c(0.03, 0.03),
+          cat.fontfamily = "serif",
+          disable.logging = TRUE)
+
+Down_Overlap <- calculate.overlap(x = list(KO_Data_Venn_Down,GCGR_Ab_Data_Venn_Down)) %>% .[["a3"]] %>% as.data.frame(row.names = "ENSEMBL") %>% t() %>% as_tibble() %>% semi_join(All_Sig_Genes_GCGR_Ab,., by = "ENSEMBL") %>% dplyr::select("ENSEMBL","gene_name","gene_symbol","padj","foldChange")
+
+All_Sig_Genes_KOvsWT_Overlap <- rename(All_Sig_Genes_KOvsWT, foldChange_KO = foldChange, padj_KO = padj) %>% dplyr::select("ENSEMBL", "padj_KO","foldChange_KO")
+
+Down_Overlap <- left_join(Down_Overlap, All_Sig_Genes_KOvsWT_Overlap, by = "ENSEMBL") %>% rename(., foldChange_Ab = foldChange, padj_Ab = padj)
+
+write_xlsx(Down_Overlap, "Overlapping_Down_Genes_GcgrKO_GCGR-Ab_AA.xlsx")
+```
+
+### Session Info
+
+```{r}
+sessionInfo()
+```
