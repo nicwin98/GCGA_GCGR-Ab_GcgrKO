@@ -4,6 +4,8 @@ This repository contains the bioinformatic analyses used to analyze RNA sequenci
 - Female mice treated with a glucagon receptor antibody (GCGR Ab), REGN1193, to a control group treated with a control antibody (Clt Ab), REGN1945.
 - Glucagon receptor knock-out (GcgrKO) mice to wild-type littermates. 
 
+**Doi:** [10.5281/zenodo.7016693](https://doi.org/10.5281/zenodo.7016693)
+
 ## Data availability 
 The raw FASTQ files and the salmon quant.sf files are available in the ArrayExpress database (http://www.ebi.ac.uk/arrayexpress) under accession numbers 
 [E-MTAB-12040](https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-12040), [E-MTAB-12048](https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-12048), 
