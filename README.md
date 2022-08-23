@@ -1,10 +1,10 @@
+[![DOI](https://zenodo.org/badge/527959804.svg)](https://zenodo.org/badge/latestdoi/527959804)
+
 # GCGA, GCGR Ab, & GcgrKO
 This repository contains the bioinformatic analyses used to analyze RNA sequencing data from a study comparing livers from:
 - Female mice treated with a glucagon analogue (GCGA), NNC9204-0043, to a control group treated with PBS.
 - Female mice treated with a glucagon receptor antibody (GCGR Ab), REGN1193, to a control group treated with a control antibody (Clt Ab), REGN1945.
 - Glucagon receptor knock-out (GcgrKO) mice to wild-type littermates. 
-
-**Doi:** [10.5281/zenodo.7016693](https://doi.org/10.5281/zenodo.7016693)
 
 ## Data availability 
 The raw FASTQ files and the salmon quant.sf files are available in the ArrayExpress database (http://www.ebi.ac.uk/arrayexpress) under accession numbers 
